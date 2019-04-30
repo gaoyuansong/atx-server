@@ -364,6 +364,7 @@
                 url: "/devices/" + dataNew.udid + "/info",
                 dataType: "json",
               }).then(function (ret) {
+                console.log("info order = " + ret)
                 this.devices = this.devices.map(function (d) {
                   if (d.udid == dataNew.udid) {
                     return ret;

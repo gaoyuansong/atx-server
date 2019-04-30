@@ -80,6 +80,7 @@ var MiniTouch = {
     var control = {}
 
     function sendJSON(obj) {
+      console.log("sendJSON",JSON.stringify(obj));
       ws.send(JSON.stringify(obj))
     }
 

@@ -120,9 +120,27 @@
                 <tab-item v-on:additem="addTabItem" :active="navtabs.active" tabid="home" name="常用">
                   <button @click="fixRotation" class="btn btn-default btn-sm">
                     <span class="glyphicon glyphicon-repeat"></span> 修复旋转</button>
-                  <button @click="fixMinicap" class="btn btn-default btn-sm" disabled=true>
+                  <button @click="fixMinicap" class="btn btn-default btn-sm" >
                     <span class="fa fa-legal"></span> 修复minicap</button>
+                  <button @click="fixMinitouch" class="btn btn-default btn-sm" >
+                    <span class="fa fa-legal"></span> 修复minitouch</button>
+                  <button @click="startApp" class="btn btn-default btn-sm" >
+                    <span class="fa fa-legal"></span> 启动应用</button>
                   <div style="padding-top: 10px" v-text="fixConsole"></div>
+
+                  <div>
+                    <button @click="fixUiautomator" class="btn btn-default btn-sm" >
+                      <span class="fa fa-legal"></span> 修复 Uiautomator2</button>
+                    <button @click="startMonitor" class="btn btn-default btn-sm" >
+                      <span class="fa fa-legal"></span> 启动监控</button>
+                    <button @click="startTesting" class="btn btn-default btn-sm" >
+                      <span class="fa fa-legal"></span> 开始测试</button>
+                    <button @click="endTesting" class="btn btn-default btn-sm" >
+                      <span class="fa fa-legal"></span> 结束测试</button>
+                    <button @click="saveScreenshot()" class="btn btn-sm btn-default">
+                      <i class="fa fa-image"></i> 截图</button>
+                  </div>                  
+                  <!--
                   <p>
                     安装
                     <a href="https://chrome.google.com/webstore/detail/tab-capturing-sharing/pcnepejfgcmidedoimegcafiabjnodhk">Chrome 插件 Tap Sharing</a> 让其他人也能看到你的操作
@@ -172,7 +190,7 @@
                         低速录制
                         <i class="fa fa-circle color-red"></i>
                       </button>
-                      <!-- <button v-if="!videoReceiver" -->
+                      
                       <button v-if="videoReceiver" type="button" class="btn btn-sm btn-default" @click="stopVideoRecord">
                         停止录制
                         <i class="fa fa-stop color-blue"></i>
@@ -210,6 +228,7 @@
                       </div>
                     </div>
                   </div>
+                  -->
 
                 </tab-item>
 

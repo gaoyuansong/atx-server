@@ -30,6 +30,16 @@ window.app = new Vue({
       port: 7912,
     },
     deviceInfo: {},
+    deviceList: [],
+    mainDeviceLocation: [0,0],
+    deviceCfg: {
+      'db03aca0':['pro2',1080,2160,2.5, 125,90,0.5, 0],
+      'd749c6c':['xiaomi6x',1080,2160,3, 150,130,0.5, 0],
+      'S2D7N19109005177':['Mate20 Pro',1080,2340,4,200,0,0.462, 0],
+      '98899a48464e524f33':['S8',1440,2960,4,200,0,0.486, 0],
+      '5df4b17d':['x23',1080,2340,3,150,130,0.462, 0]
+    },
+    deviceCfging:{},
     fixConsole: '', // log for fix minicap and rotation
     navtabs: {
       active: location.hash.slice(1) || 'home',
@@ -74,6 +84,7 @@ window.app = new Vue({
     videoReceiver: null, // sub function to receive image
     inputText: '',
     inputWS: null,
+    isMultiphone: true,
   },
   watch: {},
   computed: {
@@ -104,12 +115,44 @@ window.app = new Vue({
       url: this.deviceUrl + "/info", // "/devices/" + this.deviceUdid + "/info",
       dateType: "json"
     }).then(function (ret) {
+      //console.log("device info",ret);
       this.deviceInfo = ret;
       document.title = ret.model;
     }.bind(this))
 
+    function sleep(numberMillis) {
+      var now = new Date();
+      var exitTime = now.getTime() + numberMillis;
+      while (true) {
+        now = new Date();
+        if (now.getTime() > exitTime)
+        return;
+          }
+    }
+    sleep(2000);    
+    $.ajax({
+      url: "/list",
+    }).then(function (ret) {
+      console.log("ret",ret);
+      var data = [];
+      ret.map((d) => {
+        if((d.using == false && d.present == true && d.ready == true) ){
+          //d.multi = (self.deviceCfg[d.serial][2]/self.deviceCfg[d.serial][3]) / (self.deviceCfg[self.deviceInfo.serial][2] / self.deviceCfg[self.deviceInfo.serial][3]);
+          d.multi = (self.deviceCfg[self.deviceInfo.serial][2] / self.deviceCfg[self.deviceInfo.serial][3]) / (self.deviceCfg[d.serial][2] / self.deviceCfg[d.serial][3]);
+          d.navBar = self.deviceCfg[d.serial][5];
+          d.appBotBar = self.deviceCfg[d.serial][4];
+          d.heightY = self.deviceCfg[d.serial][7];
+          data.push(d);
+          this.deviceList.push(d);
+        }
+      });
+      //this.deviceList = data;
+      console.log("this.deviceList",this.deviceList);
+    }.bind(this))
+
     this.reserveDevice()
       .then(function () {
+        console.log("reserveDevice ...");
         this.enableTouch();
         this.openScreenStream();
       }.bind(this))
@@ -302,10 +345,11 @@ window.app = new Vue({
         url: this.deviceUrl + "/screenshot",
         cache: false,
         xhrFields: {
-          responseType: 'blob'
+          responseType: 'image/png'
         },
       }).then(function (blob) {
-        saveAs(blob, "screenshot.jpg") // saveAs require FileSaver.js
+        alert(typeof blob)
+        // saveAs(blob, "screenshot33.jpg") // saveAs require FileSaver.js
       })
     },
     openBrowser: function (url) {
@@ -357,6 +401,7 @@ window.app = new Vue({
       })
         .then(function () {
           this.fixConsole = "download mincap to device ..."
+          console.log("download mincap to device ...");
           return $.ajax({
             url: this.deviceUrl + "/minicap",
             method: "put",
@@ -364,10 +409,122 @@ window.app = new Vue({
         }.bind(this))
         .then(function () {
           this.fixConsole = "minicap fixed"
+          console.log("minicap fixed");
         }.bind(this), function () {
+          console.log("minicap can not be fixed, open Browser Console for more detail ...");
           this.fixConsole = "minicap can not be fixed, open Browser Console for more detail"
         }.bind(this))
     },
+
+    fixMinitouch: function () {
+      this.fixConsole = "remove old minitouch";
+      $.ajax({
+        method: "post",
+        url: this.deviceUrl + "/shell",
+        data: {
+          command: "rm -f /data/local/tmp/minitouch"
+        }
+      })
+        .then(function () {
+          this.fixConsole = "download minitouch to device ..."
+          console.log("download minitouch to device ...");
+          return $.ajax({
+            url: this.deviceUrl + "/minitouch",
+            method: "put",
+          })
+        }.bind(this))
+        .then(function () {
+          this.fixConsole = "minitouch fixed"
+          console.log("minitouch fixed");
+        }.bind(this), function () {
+          console.log("minitouch can not be fixed, open Browser Console for more detail ...");
+          this.fixConsole = "minitouch can not be fixed, open Browser Console for more detail"
+        }.bind(this))
+    },
+
+    startApp: function () {
+      console.log('start app ...');
+      var self = this;
+      if(self.isMultiphone == true) {
+        console.log("startApp isMultiphone",self.deviceList.length);
+        console.log(this.deviceUrl)
+        for(var i = 0; i < self.deviceList.length; i++){
+          $.ajax({
+            url: "http://" + self.deviceList[i].ip + ":7912" + "/shell",
+            data: {
+              command: "am start -n com.wuba/.activity.launch.LaunchActivity"
+            }
+          }).then(function (ret) {
+            console.log("start app end")
+          })
+        }
+
+      }else {
+        $.ajax({
+          url: this.deviceUrl + "/shell",
+          data: {
+            command: "am start -n com.wuba/.activity.launch.LaunchActivity"
+          }
+        }).then(function (ret) {
+          console.log("start app end")
+        })
+      }
+/*
+      $.ajax({
+        url: this.deviceUrl + "/shell",
+        data: {
+          command: "am start -n com.wuba/.activity.launch.LaunchActivity"
+        }
+      }).then(function (ret) {
+        console.log("start app end")
+      })
+      */
+      
+    },
+
+    fixUiautomator: function () {
+      console.log('fixUiautomator...');
+      var self = this;
+      if(self.isMultiphone == true) {
+        console.log("fixUiautomator isMultiphone",self.deviceList.length);
+        for(var i = 0; i < self.deviceList.length; i++){
+          console.log(self.deviceList[i].ip)
+          $.ajax({
+            url: "http://" + self.deviceList[i].ip + ":7912" + "/uiautomator",
+            method: "POST",
+            success: function (ret) {
+              console.log(ret);
+            },
+            error: function (ret) {
+              console.log(ret)
+            }
+          }).then(function (ret) {
+            console.log("ret")
+          })
+        }
+
+      }else {
+        $.ajax({
+          url: this.deviceUrl + "/uiautomator",
+          method: "POST",
+        }).then(function (ret) {
+          console.log("ret")
+        })
+      }
+    },
+
+    startMonitor: function () {
+      console.log('startMonitor ...');
+    },
+
+    startTesting: function () {
+      console.log('startTesting ...');
+    },
+
+    endTesting: function () {
+      console.log('endTesting ...');
+    },
+
     tabScroll: function (ev) {
       // var el = ev.target;
       // var el = this.$refs.tab_content;
@@ -414,7 +571,49 @@ window.app = new Vue({
       return this.shell("input keyevent " + meta.toUpperCase());
     },
     shell: function (command) {
-      return $.ajax({
+      console.log("command",command)
+
+      var self = this;
+      if(self.isMultiphone == true) {
+        console.log("shell isMultiphone",self.deviceList.length);
+        for(var i = 0; i < self.deviceList.length; i++){
+          $.ajax({
+            url: "http://" + self.deviceList[i].ip + ":7912" + "/shell",
+            method: "post",
+            data: {
+              command: command,
+            },
+            success: function (ret) {
+              console.log(ret);
+            },
+            error: function (ret) {
+              console.log(ret)
+            }
+          }).then(function (ret) {
+            console.log("run shell end")
+          })
+        }
+
+      }else {
+        $.ajax({
+          url: this.deviceUrl + "/shell",
+          method: "post",
+          data: {
+            command: command,
+          },
+          success: function (ret) {
+            console.log(ret);
+          },
+          error: function (ret) {
+            console.log(ret)
+          }
+        }).then(function (ret) {
+          console.log("run shell end")
+        })
+      }
+
+      return ;
+      /*$.ajax({
         url: this.deviceUrl + "/shell",
         method: "post",
         data: {
@@ -427,6 +626,7 @@ window.app = new Vue({
           console.log(ret)
         }
       })
+      */
     },
     showError: function (error) {
       this.loading = false;
@@ -443,7 +643,7 @@ window.app = new Vue({
     initDragDealer: function () {
       var self = this;
       var updateFunc = null;
-
+      console.log("keyeinitDragDealervent")
       function dragMoveListener(evt) {
         evt.preventDefault();
         updateFunc(evt);
@@ -451,12 +651,14 @@ window.app = new Vue({
       }
 
       function dragStopListener(evt) {
+        console.log("dragStopListener")
         document.removeEventListener('mousemove', dragMoveListener);
         document.removeEventListener('mouseup', dragStopListener);
         document.removeEventListener('mouseleave', dragStopListener);
       }
 
       $('#vertical-gap1').mousedown(function (e) {
+        console.log("mousedown")
         e.preventDefault();
         updateFunc = function (evt) {
           $("#left").width(evt.clientX);
@@ -520,7 +722,7 @@ window.app = new Vue({
         img = this.imagePool.next();
 
       img.onload = function () {
-        console.log("image")
+        console.log("img.onload ")
         fgcanvas.width = bgcanvas.width = img.width
         fgcanvas.height = bgcanvas.height = img.height
 
@@ -563,6 +765,7 @@ window.app = new Vue({
       return dtd;
     },
     openScreenStream: function () {
+      console.log("openScreenStream ...");
       var self = this;
       var BLANK_IMG =
         'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
@@ -606,6 +809,7 @@ window.app = new Vue({
             canvas.width = img.width
             canvas.height = img.height
             ctx.drawImage(img, 0, 0, img.width, img.height);
+            
             self.resizeScreen(img);
 
 
@@ -646,7 +850,7 @@ window.app = new Vue({
           self.rotation = parseInt(message.data.substr('rotation '.length), 10);
           console.log(self.rotation)
         } else {
-          console.log("receive message:", message.data)
+          console.log("receive message 2:", message.data)
         }
       }
 
@@ -655,8 +859,13 @@ window.app = new Vue({
       }.bind(this)
 
       ws.onerror = function (ev) {
-        console.log("screen websocket error")
+        console.log("screen websocket error");
+        self.reConnectScreenStream();
       }
+    },
+
+    reConnectScreenStream: function() {
+      this.openScreenStream();
     },
     enableTouch: function () {
       /**
@@ -668,26 +877,73 @@ window.app = new Vue({
       var screen = {
         bounds: {}
       }
+      console.log("enableTouch")
 
-      var ws = new WebSocket(this.deviceUrl.replace("http:", "ws:") + "/minitouch")
-      ws.onerror = function (ev) {
-        console.log("minitouch websocket error:", ev)
+      var control = null;
+      var multiControl = [];
+      var WebSockets = {};
+      
+      WebSockets.init = function() {
+        var ws = null;
+        //var control = null;
+        //var multiControl = [];
+        console.log("create websocket");
+        if(self.isMultiphone == true){
+          for(var i = 0; i < self.deviceList.length; i++){
+            //ws://192.168.199.171:7912
+            var tmpUrl = "ws://" + self.deviceList[i].ip + ":" + self.deviceList[i].port  + "/minitouch";
+            console.log("tmpurl",tmpUrl);
+            var wsMulti = new WebSocket(tmpUrl)
+            wsMulti.onerror = function (ev) {
+              console.log("minitouch websocket error:", ev)
+              onClose(ev);
+            }
+            wsMulti.onmessage = function (ev) {
+              console.log("minitouch websocket receive message:", ev.data);
+            }
+            wsMulti.onclose = function (ev) {
+              console.log("minitouch websocket closed");
+              onClose(ev);
+            }
+            multiControl.push(MiniTouch.createNew(wsMulti));
+          }
+        
+        }else{
+          ws = new WebSocket(this.deviceUrl.replace("http:", "ws:") + "/minitouch")
+          ws.onerror = function (ev) {
+            console.log("minitouch websocket error:", ev);
+            onClose(ev);
+          }
+          ws.onmessage = function (ev) {
+            console.log("minitouch websocket receive message:", ev.data);
+          }
+          ws.onclose = function () {
+            console.log("minitouch websocket closed");
+            onClose(ev);
+          }
+          //control = this.control = MiniTouch.createNew(ws);
+          control = iniTouch.createNew(ws);
+        }
       }
-      ws.onmessage = function (ev) {
-        console.log("minitouch websocket receive message:", ev.data);
-      }
-      ws.onclose = function () {
-        console.log("minitouch websocket closed");
-      }
-      var control = this.control = MiniTouch.createNew(ws);
 
+      function reConnect(){
+        console.log("socket 连接断开，正在尝试重新建立连接");
+        WebSockets.init();
+      }
+
+      function onClose(ev) {
+        console.log("DISCONNECTED")
+        reConnect();
+      }
+      WebSockets.init();
+      console.log("control",control);
       function calculateBounds() {
         var el = element;
         screen.bounds.w = el.offsetWidth
         screen.bounds.h = el.offsetHeight
         screen.bounds.x = 0
         screen.bounds.y = 0
-
+        console.log("calculateBounds")
         while (el.offsetParent) {
           screen.bounds.x += el.offsetLeft
           screen.bounds.y += el.offsetTop
@@ -707,6 +963,7 @@ window.app = new Vue({
       }
 
       function mouseDownListener(event) {
+        console.log("mouseDownListener")
         var e = event;
         if (e.originalEvent) {
           e = e.originalEvent
@@ -725,16 +982,101 @@ window.app = new Vue({
         var pressure = 0.5
         activeFinger(0, e.pageX, e.pageY, pressure);
 
-        var scaled = coords(screen.bounds.w, screen.bounds.h, x, y, self.rotation);
-        control.touchDown(0, scaled.xP, scaled.yP, pressure);
-        control.touchCommit();
+        /*
+        console.log("screen.bounds.x",screen.bounds.x);
+        console.log("screen.bounds.y",screen.bounds.y);
+        console.log("screen.bounds.w",screen.bounds.w);
+        console.log("screen.bounds.h",screen.bounds.h);
+        console.log("e.pageX",e.pageX);
+        console.log("e.pageY",e.pageY);
+        */
 
+        var scaled = coords(screen.bounds.w, screen.bounds.h, x, y, self.rotation);
+        self.mainDeviceLocation[0] = scaled.xP;
+        self.mainDeviceLocation[1] = scaled.yP;
+        if(self.isMultiphone == true) {
+          console.log("isMultiphone",multiControl.length);
+          var type = 0;
+          var curDeviceHe = self.deviceCfg[self.deviceInfo.serial][2] * scaled.yP;
+          var curDeviceNavHe = self.deviceCfg[self.deviceInfo.serial][2]- self.deviceCfg[self.deviceInfo.serial][5];
+          var curDeviceBotHe = curDeviceNavHe - self.deviceCfg[self.deviceInfo.serial][4];
+          console.log("curDeviceHe",curDeviceHe);
+          console.log("curDeviceNavHe",curDeviceNavHe);
+          console.log("curDeviceBotHe",curDeviceBotHe);
+          if (curDeviceHe > curDeviceBotHe &&  curDeviceHe < curDeviceNavHe) {
+            console.log("type 1")
+            type = 1;
+          }
+          
+          else if (curDeviceHe >= curDeviceNavHe) {
+            console.log("type 3")
+            type = 3;
+          }
+          else if (curDeviceHe < curDeviceBotHe) {
+            for(var i = 0; i < multiControl.length; i++){
+              console.log("self.deviceList[i].display.height",self.deviceList[i].display.height)
+              var tmpY = scaled.yP * self.deviceList[i].multi * self.deviceList[i].display.height;
+              var tmpNavHei = self.deviceList[i].display.height - self.deviceList[i].navBar;
+              var tmpBotHei = tmpNavHei- self.deviceList[i].appBotBar;
+              /*
+              console.log(typeof(tmpY) + tmpY);
+              console.log(typeof(tmpBotHei)+tmpBotHei);
+              console.log(typeof(tmpNavHei) + tmpNavHei);
+              */
+              if(Number(tmpY) > Number(tmpBotHei)) {
+                type = 2;
+                console.log("type 2")
+                break;
+                
+              }
+            }
+            
+          }
+          else {
+            type = 0;
+            console.log("type 0")
+          }
+          
+          if (Number(type) == 0){
+            console.log("im here 0")
+            for(var i = 0; i < multiControl.length; i++){
+              console.log("mutiControl",multiControl[i]);
+              multiControl[i].touchDown(0, scaled.xP, scaled.yP * self.deviceList[i].multi, pressure);
+              multiControl[i].touchCommit();
+            }
+          }
+          else if(Number(type) == 1){
+            console.log("im here 1")
+            for(var i = 0; i < multiControl.length; i++){
+              console.log("mutiControl",multiControl[i]);
+              var  tmpNavHei= self.deviceList[i].display.height - self.deviceList[i].navBar;
+              var  tmpBotHei= tmpNavHei- self.deviceList[i].appBotBar;
+              var tmpScaledY = (tmpBotHei + tmpNavHei) / 2 / self.deviceList[i].display.height;
+              multiControl[i].touchDown(0, scaled.xP, tmpScaledY, pressure);
+              multiControl[i].touchCommit();
+            }
+          }
+          else {
+            console.log("bu fu he fan wei");
+          }
+
+
+        }else {
+          console.log("isMultiphone",multiControl.length);
+          console.log("control",control);
+          control.touchDown(0, scaled.xP, scaled.yP, pressure);
+          control.touchCommit();
+        }
+        //control.touchDown(0, scaled.xP, scaled.yP, pressure);
+        //control.touchCommit();
+        console.log("this.deviceList",self.deviceList)
         element.removeEventListener('mousemove', mouseHoverListener);
         element.addEventListener('mousemove', mouseMoveListener);
         document.addEventListener('mouseup', mouseUpListener);
       }
 
       function mouseMoveListener(event) {
+        console.log("mouseMoveListener")
         var e = event
         if (e.originalEvent) {
           e = e.originalEvent
@@ -749,9 +1091,85 @@ window.app = new Vue({
         activeFinger(0, e.pageX, e.pageY, pressure);
         var x = e.pageX - screen.bounds.x
         var y = e.pageY - screen.bounds.y
+        console.log("screen.bounds.x",screen.bounds.x);
+        console.log("screen.bounds.y",screen.bounds.y);
+        console.log("screen.bounds.w",screen.bounds.w);
+        console.log("screen.bounds.h",screen.bounds.h);
+        console.log("e.pageX",e.pageX);
+        console.log("e.pageY",e.pageY);
         var scaled = coords(screen.bounds.w, screen.bounds.h, x, y, self.rotation);
-        control.touchMove(0, scaled.xP, scaled.yP, pressure);
-        control.touchCommit();
+        if(self.isMultiphone == true) {
+          /*
+          console.log("isMultiphone",multiControl.length);
+          for(var i = 0; i < multiControl.length; i++){
+            multiControl[i].touchMove(0, scaled.xP, scaled.yP * self.deviceList[i].multi, pressure);
+            multiControl[i].touchCommit();
+          }*/
+          console.log("isMultiphone",multiControl.length);
+          var type = 0;
+          var curDeviceHe = self.deviceCfg[self.deviceInfo.serial][2] * scaled.yP;
+          var curDeviceNavHe = self.deviceCfg[self.deviceInfo.serial][2]- self.deviceCfg[self.deviceInfo.serial][5];
+          var curDeviceBotHe = curDeviceNavHe - self.deviceCfg[self.deviceInfo.serial][4];
+          if (curDeviceHe > curDeviceBotHe &&  curDeviceHe < curDeviceNavHe) {
+            console.log("type 1")
+            type = 1;
+          }
+          
+          else if (curDeviceHe >= curDeviceNavHe) {
+            console.log("type 3")
+            type = 3;
+          }
+          else if (curDeviceHe < curDeviceBotHe) {
+            for(var i = 0; i < multiControl.length; i++){
+              console.log("self.deviceList[i].display.height",self.deviceList[i].display.height)
+              var tmpY = scaled.yP * self.deviceList[i].multi * self.deviceList[i].display.height;
+              var tmpNavHei = self.deviceList[i].display.height - self.deviceList[i].navBar;
+              var tmpBotHei = tmpNavHei- self.deviceList[i].appBotBar;
+              if(Number(tmpY) > Number(tmpBotHei)) {
+                type = 2;
+                console.log("type 2")
+                break;    
+              }
+            }
+            
+          }
+          else {
+            type = 0;
+            console.log("type 0")
+          }
+          
+          if (Number(type) == 0){
+            console.log("im here 0")
+            for(var i = 0; i < multiControl.length; i++){
+              console.log("mutiControl",multiControl[i]);
+              multiControl[i].touchMove(0, scaled.xP, scaled.yP * self.deviceList[i].multi, pressure);
+              multiControl[i].touchCommit();
+            }
+          }
+          /*
+          else if(Number(type) == 1){
+            console.log("im here 1")
+            for(var i = 0; i < multiControl.length; i++){
+              console.log("mutiControl",multiControl[i]);
+              var  tmpNavHei= self.deviceList[i].display.height - self.deviceList[i].navBar;
+              var  tmpBotHei= tmpNavHei- self.deviceList[i].appBotBar;
+              var tmpScaledY = (tmpBotHei + tmpNavHei) / 2 / self.deviceList[i].display.height;
+              multiControl[i].touchMove(0, scaled.xP, tmpScaledY, pressure);
+              multiControl[i].touchCommit();
+            }
+          }*/
+          else {
+            console.log("bu fu he fan wei");
+          }
+          self.mainDeviceLocation[0] = 0;
+          self.mainDeviceLocation[1] = 0;
+        }else{
+          control.touchMove(0, scaled.xP, scaled.yP, pressure);
+          control.touchCommit();
+        }
+
+        //control.touchMove(0, scaled.xP, scaled.yP, pressure);
+        //control.touchCommit();
       }
 
       function mouseUpListener(event) {
@@ -764,13 +1182,25 @@ window.app = new Vue({
           return
         }
         e.preventDefault()
+        console.log("mouseUpListener")
+        if(self.isMultiphone == true) {
+          console.log("isMultiphone",multiControl.length);
+          for(var i = 0; i < multiControl.length; i++){
+            multiControl[i].touchUp(0);
+            multiControl[i].touchCommit();
+          }
 
-        control.touchUp(0)
-        control.touchCommit();
+        }else{
+          control.touchUp(0);
+          control.touchCommit();
+        }
+        //control.touchUp(0)
+        //control.touchCommit();
         stopMousing()
       }
 
       function stopMousing() {
+        console.log("imstopMousingage")
         element.removeEventListener('mousemove', mouseMoveListener);
         // element.addEventListener('mousemove', mouseHoverListener);
         document.removeEventListener('mouseup', mouseUpListener);
@@ -810,17 +1240,30 @@ window.app = new Vue({
       var wheelTimer, fromYP;
 
       function mouseWheelDelayTouchUp() {
+        console.log("mouseWheelDelayTouchUp");
         clearTimeout(wheelTimer);
         wheelTimer = setTimeout(function () {
           fromYP = null;
-          control.touchUp(1)
-          control.touchCommit();
+          if(self.isMultiphone == true) {
+            console.log("isMultiphone",multiControl.length);
+            for(var i = 0; i < multiControl.length; i++){
+              multiControl[i].touchUp(1);
+              multiControl[i].touchCommit();
+            }
+  
+          }else{
+            control.touchUp(1);
+            control.touchCommit();
+          }
+          //control.touchUp(1)
+          //control.touchCommit();
           // deactiveFinger(0);
           // deactiveFinger(1);
         }, 100)
       }
 
       function mouseWheelListener(event) {
+        console.log("mouseWheelListener")
         var e = event;
         if (e.originalEvent) {
           e = e.originalEvent
@@ -837,8 +1280,72 @@ window.app = new Vue({
           fromYP = y / screen.bounds.h; // display Y percent
           // touch down when first detect mousewheel
           scaled = coords(screen.bounds.w, screen.bounds.h, x, y, self.rotation);
-          control.touchDown(1, scaled.xP, scaled.yP, pressure);
-          control.touchCommit();
+          if(self.isMultiphone == true) {
+            for(var i = 0; i < multiControl.length; i++){
+              console.log("mutiControl",multiControl[i]);
+              multiControl[i].touchDown(1, scaled.xP, scaled.yP * self.deviceList[i].multi, pressure);
+              multiControl[i].touchCommit();
+            }
+            /*
+            console.log("isMultiphone",multiControl.length);
+          var type = 0;
+          var curDeviceHe = self.deviceCfg[self.deviceInfo.serial][2] * scaled.yP;
+          var curDeviceBotHe = self.deviceCfg[self.deviceInfo.serial][2]- self.deviceCfg[self.deviceInfo.serial][5];
+          var curDeviceNavHe = curDeviceBotHe - self.deviceCfg[self.deviceInfo.serial][4];
+          if (curDeviceHe >curDeviceNavHe &&  curDeviceHe < curDeviceBotHe) {
+            console.log("type 1")
+            type = 1;
+          }
+          
+          else if (curDeviceHe >= curDeviceBotHe) {
+            console.log("type 3")
+            type = 3;
+          }
+          else if (curDeviceHe < curDeviceNavHe) {
+            for(var i = 0; i < multiControl.length; i++){
+              var tmpY = scaled.yP * self.deviceList[i].multi * self.deviceList[i].display.height;
+              var tmpBotHei = self.deviceList[i].display.height - self.deviceList[i].appBotBar;
+              var tmpNavHei = tmpBotHei- self.deviceList[i].navBar;
+              if(tmpY > tmpNavHei ){
+                type = 2;
+                break;
+              }
+            }
+            console.log("type 2")
+          }
+          else {
+            type = 0;
+            console.log("type 0")
+          }
+          
+          if (type == 0){
+            for(var i = 0; i < multiControl.length; i++){
+              console.log("mutiControl",multiControl[i]);
+              multiControl[i].touchDown(1, scaled.xP, scaled.yP * self.deviceList[i].multi, pressure);
+              multiControl[i].touchCommit();
+            }
+          }
+          else if(type == 1){
+            for(var i = 0; i < multiControl.length; i++){
+              console.log("mutiControl",multiControl[i]);
+              var tmpBotHei = self.deviceList[i].display.height - self.deviceList[i].appBotBar;
+              var tmpNavHei = tmpBotHei- self.deviceList[i].navBar;
+              var tmpScaledY = (tmpBotHei + tmpNavHei) / 2 / self.deviceList[i].display.height;
+              multiControl[i].touchDown(1, scaled.xP, tmpScaledY, pressure);
+              multiControl[i].touchCommit();
+            }
+          }
+          else {
+            console.log("bu fu he fan wei");
+          }*/
+  
+          }else{
+            control.touchDown(1, scaled.xP, scaled.yP, pressure);
+            control.touchCommit();
+          }
+
+          //control.touchDown(1, scaled.xP, scaled.yP, pressure);
+          //control.touchCommit();
           // activeFinger(0, e.pageX, e.pageY, pressure);
         }
         // caculate position after scroll
@@ -851,9 +1358,22 @@ window.app = new Vue({
           var pageY = y + screen.bounds.y;
           scaled = coords(screen.bounds.w, screen.bounds.h, x, y, self.rotation);
           // activeFinger(1, e.pageX, pageY, pressure);
-          control.touchMove(1, scaled.xP, scaled.yP, pressure);
-          control.touchWait(10);
-          control.touchCommit();
+          if(self.isMultiphone == true) {
+            console.log("isMultiphone",multiControl.length);
+            for(var i = 0; i < multiControl.length; i++){
+              multiControl[i].touchMove(1, scaled.xP, scaled.yP * self.deviceList[i].multi, pressure);
+              multiControl[i].touchWait(10);
+              multiControl[i].touchCommit();
+            }
+  
+          }else{
+            control.touchMove(1, scaled.xP, scaled.yP * self.deviceList[i].multi, pressure);
+            control.touchWait(10);
+            control.touchCommit();
+          }
+          //control.touchMove(1, scaled.xP, scaled.yP, pressure);
+          //control.touchWait(10);
+          //control.touchCommit();
         }
         fromYP = toYP;
         mouseWheelDelayTouchUp()

@@ -1,0 +1,12 @@
+./atx-server --port 8000
+python -m uiautomator2 init --server 10.252.161.41:8000
+rethinkdb
+
+
+04-28 17:42:03.916 E/adbd    (26229): service_to_fd: shell:/data/local/tmp/atx-agent -stop
+04-28 17:42:04.028 E/adbd    (26229): service_to_fd: shell:killall atx-agent
+04-28 17:42:04.095 E/adbd    (26229): service_to_fd: shell:rm /sdcard/atx-agent.pid
+04-28 17:42:04.135 E/adbd    (26229): service_to_fd: shell:rm /sdcard/atx-agent.log.old
+04-28 17:42:04.455 E/adbd    (26229): service_to_fd: shell:/data/local/tmp/atx-agent server --stop
+04-28 17:42:04.689 E/adbd    (26229): service_to_fd: shell:/data/local/tmp/atx-agent server -d -t 10.252.161.41:8000
+04-28 17:42:05.552 E/adbd    (26229): service_to_fd: shell:am start -a android.intent.action.VIEW -d https://github.com/openatx/uiautomator2

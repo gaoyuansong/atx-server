@@ -19,12 +19,13 @@ func initDB(address, dbName string) {
 	r.SetTags("gorethink", "json")
 	r.SetVerbose(true)
 	session, err := r.Connect(r.ConnectOpts{
-		Address:    address,
+		Address:    "localhost:28015",
 		Database:   dbName,
-		InitialCap: 1,
+		InitialCap: 10,
 		MaxOpen:    10,
 	})
-
+        log.Info(address)
+        log.Info(dbName)
 	if err != nil {
 		log.Fatal(err)
 	}
